@@ -1,6 +1,9 @@
 package cdk
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // Secret 16组秘钥 每组8位 十进制
 var Secret = [][]int32{
@@ -80,4 +83,30 @@ func TestCdk_GenerateRandomSecret(t *testing.T) {
 		return
 	}
 	t.Log(s)
+}
+
+func TestCdk_BatchGeneratePerformance(t *testing.T) {
+	c := New(Secret, CharTable)
+	count := 100000
+	start := time.Now() // 获取当前时间
+	_, err := c.BatchGenerate(100001, uint(count))
+	if err != nil {
+		t.Errorf("BatchGenerate returned an error: %v", err)
+	}
+	duration := time.Since(start) // 计算执行时间
+	t.Logf("BatchGenerate took %v to generate %v codes", duration, count)
+}
+
+func TestCdk_GeneratePerformance(t *testing.T) {
+	c := New(Secret, CharTable)
+	count := 100000
+	start := time.Now() // 获取当前时间
+	for i := 0; i < count; i++ {
+		_, err := c.Generate(100001 + i)
+		if err != nil {
+			t.Errorf("Generate returned an error: %v", err)
+		}
+	}
+	duration := time.Since(start) // 计算执行时间
+	t.Logf("Generate took %v to generate %v codes", duration, count)
 }
