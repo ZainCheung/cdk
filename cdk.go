@@ -113,6 +113,10 @@ var ExampleCharTable = []string{
 // string: 生成的激活码。
 // error: 如果在生成激活码的过程中出现错误，这个值将包含错误信息。
 func (c *Cdk) Generate(input int) (string, error) {
+	return c.generateCode(input)
+}
+
+func (c *Cdk) generateCode(input int) (string, error) {
 	// 生成10位的激活码
 	// 1. 输入自增id
 	// 2. 生成4位的新鲜值
@@ -224,19 +228,9 @@ func (c *Cdk) Parse(code string) (int, error) {
 	// 6. 用原始id和签名进行校验
 	// 7. 返回原始id
 	// 从字符表中取出对应的字符
-	var binaryString string
-	for i := 0; i < 10; i++ {
-		charIndex := -1
-		for j, c := range c.charTable {
-			if c == string(code[i]) {
-				charIndex = j
-				break
-			}
-		}
-		if charIndex == -1 {
-			return 0, fmt.Errorf("invalid character in code: %v", code[i])
-		}
-		binaryString += fmt.Sprintf("%05b", charIndex)
+	binaryString, err := c.convertToBinary(code)
+	if err != nil {
+		return 0, err
 	}
 	// 从50位的二进制中取出14位的签名，4位的fresh值，32位的自增id
 	sign := binaryString[:14]
@@ -288,13 +282,32 @@ func (c *Cdk) Parse(code string) (int, error) {
 func (c *Cdk) BatchGenerate(input int, count uint) ([]string, error) {
 	var result []string
 	for i := 0; i < int(count); i++ {
-		code, err := c.Generate(input + i)
+		code, err := c.generateCode(input + i)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, code)
 	}
 	return result, nil
+}
+
+// convertToBinary converts a string to a binary string
+func (c *Cdk) convertToBinary(s string) (string, error) {
+	var binaryString string
+	for i := 0; i < len(s); i++ {
+		charIndex := -1
+		for j, c := range c.charTable {
+			if c == string(s[i]) {
+				charIndex = j
+				break
+			}
+		}
+		if charIndex == -1 {
+			return "", fmt.Errorf("invalid character in code: %v", s[i])
+		}
+		binaryString += fmt.Sprintf("%05b", charIndex)
+	}
+	return binaryString, nil
 }
 
 // GenerateRandomSecret generates a random secret key table.
