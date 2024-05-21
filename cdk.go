@@ -112,11 +112,11 @@ var ExampleCharTable = []string{
 // 返回值:
 // string: 生成的激活码。
 // error: 如果在生成激活码的过程中出现错误，这个值将包含错误信息。
-func (c *Cdk) Generate(input int) (string, error) {
-	return c.generateCode(input)
+func (c *Cdk) Generate(incrementID int) (string, error) {
+	return c.generateCode(incrementID)
 }
 
-func (c *Cdk) generateCode(input int) (string, error) {
+func (c *Cdk) generateCode(incrementID int) (string, error) {
 	// 生成10位的激活码
 	// 1. 输入自增id
 	// 2. 生成4位的新鲜值
@@ -127,7 +127,7 @@ func (c *Cdk) generateCode(input int) (string, error) {
 	// 7. 返回激活码
 	// 原始id
 	// 转为32位二进制 前面补0
-	id := fmt.Sprintf("%032b", input)
+	id := fmt.Sprintf("%032b", incrementID)
 	// 将自增id（32位）每4位分为一组，共8组，都转为10进制
 	var inputArr []int32
 	for i := 0; i < 8; i++ {
@@ -141,7 +141,7 @@ func (c *Cdk) generateCode(input int) (string, error) {
 	// 随机0到15 转为 4位的二进制的新鲜值
 	rand.NewSource(time.Now().UnixNano())
 	randomFresh := rand.Intn(16)
-	Fresh2 := fmt.Sprintf("%04b", randomFresh)
+	freshBinary := fmt.Sprintf("%04b", randomFresh)
 	// 取出秘钥
 	secretKey := c.secret[randomFresh]
 	// 把每一组数加权求和，得到的结果就是签名
@@ -154,12 +154,12 @@ func (c *Cdk) generateCode(input int) (string, error) {
 
 	// 签名+fresh值+自增id
 	// 生成最终的50位二进制
-	final := sign14 + Fresh2 + id
+	finalBinaryCode := sign14 + freshBinary + id
 
 	// 二进制转为10组 5位的二进制 然后转为10进制 从字符表中取出对应的字符
 	var result string
 	for i := 0; i < 10; i++ {
-		decimalInt, err := strconv.ParseInt(final[i*5:i*5+5], 2, 32)
+		decimalInt, err := strconv.ParseInt(finalBinaryCode[i*5:i*5+5], 2, 32)
 		if err != nil {
 			fmt.Println("ParseInt error:", err)
 			return "", fmt.Errorf("ParseInt error: %w", err)
@@ -233,16 +233,16 @@ func (c *Cdk) Parse(code string) (int, error) {
 		return 0, err
 	}
 	// 从50位的二进制中取出14位的签名，4位的fresh值，32位的自增id
-	sign := binaryString[:14]
-	fresh := binaryString[14:18]
-	id := binaryString[18:]
-	signNum, err := strconv.ParseInt(sign, 2, 32)
+	signatureBinary := binaryString[:14]
+	freshnessBinary := binaryString[14:18]
+	incrementIDBinary := binaryString[18:]
+	signNum, err := strconv.ParseInt(signatureBinary, 2, 32)
 	if err != nil {
 		fmt.Println("ParseInt error:", err)
 		return 0, fmt.Errorf("ParseInt error: %w", err)
 	}
 	// 从fresh值中取出对应的秘钥
-	freshInt, err := strconv.ParseInt(fresh, 2, 32)
+	freshInt, err := strconv.ParseInt(freshnessBinary, 2, 32)
 	if err != nil {
 		fmt.Println("ParseInt error:", err)
 		return 0, fmt.Errorf("ParseInt error: %w", err)
@@ -251,9 +251,9 @@ func (c *Cdk) Parse(code string) (int, error) {
 	// 用秘钥对自增id进行解密，得到原始id
 	var originalId int32
 	for i := 0; i < 8; i++ {
-		originalId += secretKey[i] * int32(id[i])
+		originalId += secretKey[i] * int32(incrementIDBinary[i])
 	}
-	lastId, err := strconv.ParseInt(id, 2, 32)
+	lastId, err := strconv.ParseInt(incrementIDBinary, 2, 32)
 	if err != nil {
 		fmt.Println("ParseInt error:", err)
 		return 0, fmt.Errorf("ParseInt error: %w", err)
@@ -261,7 +261,7 @@ func (c *Cdk) Parse(code string) (int, error) {
 	// 用原始id和签名进行校验
 	var inputArr []int32
 	for i := 0; i < 8; i++ {
-		decimalInt, err := strconv.ParseInt(id[i*4:i*4+4], 2, 32)
+		decimalInt, err := strconv.ParseInt(incrementIDBinary[i*4:i*4+4], 2, 32)
 		if err != nil {
 			fmt.Println("ParseInt error:", err)
 			return 0, fmt.Errorf("ParseInt error: %w", err)
@@ -279,10 +279,10 @@ func (c *Cdk) Parse(code string) (int, error) {
 }
 
 // BatchGenerate generates multiple activation codes based on the input increment id.
-func (c *Cdk) BatchGenerate(input int, count uint) ([]string, error) {
+func (c *Cdk) BatchGenerate(startIncrementID int, numCodes uint) ([]string, error) {
 	var result []string
-	for i := 0; i < int(count); i++ {
-		code, err := c.generateCode(input + i)
+	for i := 0; i < int(numCodes); i++ {
+		code, err := c.generateCode(startIncrementID + i)
 		if err != nil {
 			return nil, err
 		}
@@ -316,20 +316,20 @@ func (c *Cdk) convertToBinary(s string) (string, error) {
 //
 // The function prints the secret key table in the format of a Go slice, and you can copy and paste it into your code.
 func GenerateRandomSecret() ([][]int32, error) {
-	var secret [][]int32
+	var randomSecretKeyTable [][]int32
 	for i := 0; i < 16; i++ {
 		var s []int32
 		for j := 0; j < 8; j++ {
 			s = append(s, int32(rand.Intn(100)))
 		}
-		secret = append(secret, s)
+		randomSecretKeyTable = append(randomSecretKeyTable, s)
 	}
-	fmt.Println("Here is your secret, please copy and paste it to your code:")
-	// format print secret
+	fmt.Println("Here is your random secret key table, please copy and paste it to your code:")
+	// format print randomSecretKeyTable
 	fmt.Println("var ExampleSecret = [][]int32{")
-	for _, s := range secret {
+	for _, s := range randomSecretKeyTable {
 		fmt.Printf("\t{%v, %v, %v, %v, %v, %v, %v, %v},\n", s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
 	}
 	fmt.Println("}")
-	return secret, nil
+	return randomSecretKeyTable, nil
 }
