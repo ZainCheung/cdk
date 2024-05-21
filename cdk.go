@@ -146,15 +146,17 @@ func (c *Cdk) generateCode(incrementID int) (string, error) {
 	secretKey := c.secret[randomFresh]
 	// 把每一组数加权求和，得到的结果就是签名
 	var sign int32
+	var newId string
 	for i := 0; i < 8; i++ {
 		sign += inputArr[i] * secretKey[i]
+		newId += xorBinaryStrings(fmt.Sprintf("%04b", inputArr[i]), fmt.Sprintf("%04b", secretKey[i]))
 	}
 	// 生成最终签名 转为14位的二进制 最大值16383
 	sign14 := fmt.Sprintf("%014b", sign)
 
 	// 签名+fresh值+自增id
 	// 生成最终的50位二进制
-	finalBinaryCode := sign14 + freshBinary + id
+	finalBinaryCode := sign14 + freshBinary + newId
 
 	// 二进制转为10组 5位的二进制 然后转为10进制 从字符表中取出对应的字符
 	var result string
@@ -248,12 +250,12 @@ func (c *Cdk) Parse(code string) (int, error) {
 		return 0, fmt.Errorf("ParseInt error: %w", err)
 	}
 	secretKey := c.secret[freshInt]
-	// 用秘钥对自增id进行解密，得到原始id
-	var originalId int32
+	// 用秘钥对自增id进行异或运算，得到原始id
+	var originalId string
 	for i := 0; i < 8; i++ {
-		originalId += secretKey[i] * int32(incrementIDBinary[i])
+		originalId += xorBinaryStrings(incrementIDBinary[i*4:i*4+4], fmt.Sprintf("%04b", secretKey[i]))
 	}
-	lastId, err := strconv.ParseInt(incrementIDBinary, 2, 32)
+	lastId, err := strconv.ParseInt(originalId, 2, 32)
 	if err != nil {
 		fmt.Println("ParseInt error:", err)
 		return 0, fmt.Errorf("ParseInt error: %w", err)
@@ -261,7 +263,7 @@ func (c *Cdk) Parse(code string) (int, error) {
 	// 用原始id和签名进行校验
 	var inputArr []int32
 	for i := 0; i < 8; i++ {
-		decimalInt, err := strconv.ParseInt(incrementIDBinary[i*4:i*4+4], 2, 32)
+		decimalInt, err := strconv.ParseInt(originalId[i*4:i*4+4], 2, 32)
 		if err != nil {
 			fmt.Println("ParseInt error:", err)
 			return 0, fmt.Errorf("ParseInt error: %w", err)
@@ -332,4 +334,15 @@ func GenerateRandomSecret() ([][]int32, error) {
 	}
 	fmt.Println("}")
 	return randomSecretKeyTable, nil
+}
+
+// XOR operation between two binary strings
+func xorBinaryStrings(s1, s2 string) string {
+	var result string
+	for i := 0; i < len(s1); i++ {
+		b1 := s1[i] - '0'
+		b2 := s2[i%len(s2)] - '0'
+		result += strconv.Itoa(int(b1 ^ b2))
+	}
+	return result
 }
