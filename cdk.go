@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -183,9 +184,9 @@ func (c *Cdk) generateCode(incrementID int) (string, error) {
 //
 // Then, the secret key corresponding to the fresh value is taken out.
 //
-// Then, the increment id is decrypted with the secret key to get the original id.
+// Then, the increment id is decrypting with the secret key to get the original id.
 //
-// Finally, the original id and the signature are checked.
+// Finally, check the original id and the signature.
 //
 // If the check passes, return the original id. Otherwise, return an error message.
 //
@@ -281,16 +282,59 @@ func (c *Cdk) Parse(code string) (int, error) {
 }
 
 // BatchGenerate generates multiple activation codes based on the input increment id.
+//func (c *Cdk) BatchGenerate(startIncrementID int, numCodes uint) ([]string, error) {
+//	var result []string
+//	for i := 0; i < int(numCodes); i++ {
+//		code, err := c.generateCode(startIncrementID + i)
+//		if err != nil {
+//			return nil, err
+//		}
+//		result = append(result, code)
+//	}
+//	return result, nil
+//}
+
 func (c *Cdk) BatchGenerate(startIncrementID int, numCodes uint) ([]string, error) {
-	var result []string
+	// Create a channel for results and errors
+	results := make(chan string, numCodes)
+	errs := make(chan error, numCodes)
+
+	// Create a WaitGroup
+	var wg sync.WaitGroup
+	wg.Add(int(numCodes))
+
+	// Start a goroutine for each code to generate
 	for i := 0; i < int(numCodes); i++ {
-		code, err := c.generateCode(startIncrementID + i)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, code)
+		go func(id int) {
+			defer wg.Done()
+			code, err := c.generateCode(id)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- code
+		}(startIncrementID + i)
 	}
-	return result, nil
+
+	// Start a goroutine to close the channels after all other goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errs)
+	}()
+
+	// Collect the results and errors
+	codes := make([]string, 0, numCodes)
+	for result := range results {
+		codes = append(codes, result)
+	}
+
+	// Check for errors
+	if len(errs) > 0 {
+		return nil, <-errs
+	}
+
+	return codes, nil
 }
 
 // convertToBinary converts a string to a binary string

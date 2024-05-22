@@ -67,8 +67,8 @@ and the `Parse` method to parse the redemption code back into the original incre
 
 ## Performance
 
-The `Generater` in this project is highly efficient. In benchmark tests, it was able to generate 100,000 redemption 
-codes in approximately 1.35 seconds. This makes it suitable for applications that require the generation of large 
+The `Generater` in this project is highly efficient. In benchmark tests, it was able to generate 1,000,000 redemption 
+codes in approximately 3 seconds. This makes it suitable for applications that require the generation of large 
 numbers of unique codes in a short period of time.
 
 Please note that actual performance may vary depending on the specific hardware and software environment.

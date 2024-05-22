@@ -87,7 +87,7 @@ func TestCdk_GenerateRandomSecret(t *testing.T) {
 
 func TestCdk_BatchGeneratePerformance(t *testing.T) {
 	c := New(Secret, CharTable)
-	count := 100000
+	count := 1000000
 	start := time.Now() // 获取当前时间
 	_, err := c.BatchGenerate(100001, uint(count))
 	if err != nil {
